@@ -9,7 +9,7 @@ except ImportError:
     sys.exit("Could not find zeroconf.")
 
 from PyQt5.QtCore import QObject, pyqtSignal
-
+import json 
 from . import log, utils
 from .receiver_device import AirplayReceiver, AirplayFeatures
 
@@ -49,12 +49,16 @@ class AirplayServiceListener(QObject):
         log.debug(f"Adding device '{name}' ...")
         info = zeroconf.get_service_info(type, name)
         # airplayReceivers.append(name)
-        self.devices[name] = AirplayReceiver(
+        if info: 
+            self.devices[name] = AirplayReceiver(
             name, info,
             # **{k.decode(): v.decode() for k, v in info.properties.items()}
-        )
-        log.debug(f"Airplay receiver '{name}' added, constructed: {self.devices[name]}")
-        self.receiver_added.emit(self.devices[name])
+            )
+            log.debug(f"Airplay receiver '{name}' added, constructed: {self.devices[name]}")
+            self.receiver_added.emit(self.devices[name])
+        else:
+            log.debug(f"FAILED to add {name}. Info was {info}")
+            return -1
 
         log.debug(f"Receiver addresses: {self.devices[name]._get_ip_addresses()}")
 
@@ -65,7 +69,10 @@ class AirplayServiceListener(QObject):
             return
         self.devices[name].update_service_info(info)
         log.debug(f"Airplay receiver '{name}' service updated: {self.devices[name]}")
-
+    
+    def get_devices(self):
+        return self.devices
+        
     def quit(self):
         self.ZC.close()
         log.debug("Closed ZC browser")

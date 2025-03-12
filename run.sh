@@ -1,3 +1,3 @@
 #!/bin/bash
-type python3 || echo "Is python3 installed?";
-python3 -m openairplay.gui_main
+type python || echo "Is python3 installed?";
+py -m openairplay.gui_main

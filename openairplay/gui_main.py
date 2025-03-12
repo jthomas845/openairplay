@@ -5,6 +5,7 @@ import sys
 
 from . import log
 from .receiver_device import AirplayReceiver
+import asyncio
 
 log.setLevel(log.DEBUG)
 log.debug("Debugging enabled.")
@@ -14,7 +15,7 @@ log.debug("Python version: " + sys.version)
 # Qt GUI stuff
 try:
     from PyQt5 import QtCore, QtGui, QtWidgets
-    from PyQt5.QtCore import QSettings
+    from PyQt5.QtCore import QSettings, Qt
 except ImportError:
     print("There was an error importing the Qt python3 libraries,")
     print("These are required by to operate this program.")
@@ -22,12 +23,12 @@ except ImportError:
     sys.exit("Could not import Python3 Qt Libraries.")
 
 # Airplay Things:
-from . import discovery
+from . import discovery, air_connector
+#from discovery import get_devices
 
 class Window(QtWidgets.QWidget):
     def __init__(self):
         super(Window, self).__init__()
-
         self.settings = QSettings('open-airplay')
         # Establishes a hook on our system settings.
         # http://pyqt.sourceforge.net/Docs/PyQt4/pyqt_qsettings.html
@@ -36,7 +37,8 @@ class Window(QtWidgets.QWidget):
         self.createIconGroupBox() # Tray Icon Settings
         self.createMessageGroupBox() # Test notification group
         self.createDeviceListGroupBox() # Airplay server selection
-
+        self.createConnectButton()  #connect to IP
+        
         # Set the iconlabel to it's minimum width without scollbaring.
         self.iconLabel.setMinimumWidth(self.durationLabel.sizeHint().width())
 
@@ -51,11 +53,13 @@ class Window(QtWidgets.QWidget):
         self.iconComboBox.currentIndexChanged.connect(self.setIcon)
         self.trayIcon.messageClicked.connect(self.messageClicked)
         self.trayIcon.activated.connect(self.iconActivated)
+        self.connectButton.clicked.connect(self.connectToDevice)
 
         # Finally add the GUI item groupings we made to the layout and init it.
         mainLayout = QtWidgets.QVBoxLayout()
         mainLayout.addWidget(self.iconGroupBox)
         mainLayout.addWidget(self.deviceListGroupBox)
+        mainLayout.addWidget(self.connectButton)
         mainLayout.addWidget(self.messageGroupBox)
         self.setLayout(mainLayout)
 
@@ -149,8 +153,10 @@ class Window(QtWidgets.QWidget):
     def add_receiver(self, receiver: AirplayReceiver):
         log.debug(f"Adding receiver to UI: {receiver.list_entry_name}")
         item = QtWidgets.QListWidgetItem(receiver.list_entry_name)
+        item.setData(0x0100, receiver.name)
         self.deviceSelectList.addItem(item)
         log.debug(f"Added receiver to deviceSelectList: '{receiver.name}'")
+        self.deviceSelectList.sortItems(Qt.AscendingOrder) #ensure ASC order
 
     def remove_receiver(self, receiver: AirplayReceiver):
         item_name = receiver.list_entry_name
@@ -196,6 +202,24 @@ class Window(QtWidgets.QWidget):
         deviceListLayout = QtWidgets.QHBoxLayout()
         deviceListLayout.addWidget(self.deviceSelectList)
         self.deviceListGroupBox.setLayout(deviceListLayout)
+    def createConnectButton(self):
+        self.connectButton = QtWidgets.QPushButton("Connect to")
+
+    def connectToDevice(self):
+        selected_index = self.deviceSelectList.currentRow()  # Gets the index of the highlighted item
+        selected_item_name = self.deviceSelectList.currentItem().data(0x100)  # Gets the actual item
+        devicesAll = self.service_listener.get_devices()
+        for d in devicesAll:
+            log.debug(d)
+            log.debug("\n")
+        # grab the IP
+        #IPs lie inside devices of discovery
+        selectedAirplay = devicesAll[selected_item_name]
+        log.debug(f"selectedAirplay: {selectedAirplay}")
+        device_ip = selectedAirplay.ip_address  # Assuming 'devices' is a list with device IPs
+        log.debug(f"Connecting to {selected_item_name}, at {device_ip}")
+        # connect to device_ip via ____
+        asyncio.run(air_connector.connect_to_device(device_ip))
 
     def createMessageGroupBox(self): # Add the message test GUI window grouping.
         self.messageGroupBox = QtWidgets.QGroupBox("Notification Test:")
